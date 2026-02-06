@@ -1,6 +1,1 @@
-/data/*
-__pycache__
-.mypy_cache
-/models/*
-poetry.lock
-*.jpg
+Nothing should be ignored in this case. The added file `test.jpg` is an image file which should not be added to .gitignore according to the rules, and the other changes are source/config files (.gitignore and test_outlines.py) which should not be ignored either.

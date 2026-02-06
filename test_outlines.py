@@ -53,7 +53,7 @@ model = QwenVLAdapter(hf_model, processor.tokenizer)
 
 # --- 3. Данные ---
 try:
-    image = Image.open('test.jpeg')
+    image = Image.open('test.jpg')
 except:
     print("Используем заглушку!")
     image = Image.new('RGB', (600, 400), color='red')
