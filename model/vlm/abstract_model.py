@@ -1,8 +1,13 @@
 from abc import ABC, abstractmethod
 from PIL import Image
-from typing import Any, Optional, Literal
+from typing import List, Dict, Any, Optional, Literal
 from dataclasses import dataclass
 
+@dataclass
+class Detection:
+    label: str
+    bbox: List[float] # [x1, y1, x2, y2]
+    score: Optional[float] = None
 
 @dataclass
 class ModelConfig:
@@ -12,7 +17,7 @@ class ModelConfig:
 
 
 class BaseVLM(ABC):
-    cache_dir = "C:/Users/ziglz/projects/coursework/models" 
+    cache_dir = "./models" 
     def __init__(self, config: ModelConfig):
         self.config = config
         self.model = None
@@ -36,6 +41,26 @@ class BaseVLM(ABC):
         """Генерация ответа"""
         pass
 
+    
+    def parse_coordinates(self, raw_output: Any) -> List[Detection]:
+        pass
+    
+
+    def detect(self, image: Image.Image, prompt: str = "Detect objects") -> List[Detection]:
+        """
+        Высокоуровневая обертка (Wrapper)
+        """
+        # 1. Подготавливаем данные
+        inputs = self.preprocess(image, prompt)
+        
+        # 2. Получаем сырой ответ от модели (текст или тензор)
+        raw_output = self.generate(inputs)
+        
+        # 3. Парсим результат в единый формат {label, bbox}
+        # У каждой модели этот метод будет свой (post_process)
+        formatted_output = self.parse_coordinates(raw_output)
+        
+        return formatted_output
 
     # @abstractmethod
     # def evaluate(self, dataset) -> dict:
