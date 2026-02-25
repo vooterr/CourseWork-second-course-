@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from PIL import Image
-from typing import List, Dict, Any, Optional, Literal
+from typing import List, Optional, Literal, Any
 from dataclasses import dataclass
+
 
 @dataclass
 class Detection:
     label: str
-    bbox: List[float] # [x1, y1, x2, y2]
+    bbox: List[float]  # [x1, y1, x2, y2]
     score: Optional[float] = None
 
 @dataclass
@@ -15,57 +16,25 @@ class ModelConfig:
     dtype: str = Literal["float16", "bfloat16", "float32"]
     quantization: Optional[str] = None
 
-
 class BaseVLM(ABC):
     cache_dir = "./models" 
+    
     def __init__(self, config: ModelConfig):
         self.config = config
         self.model = None
         self.processor = None
-        print("Model ID: {MODEL_ID}")
-    
-
+        
     @abstractmethod
     def load(self) -> None:
         """Загрузка модели и процессора"""
-
+        pass
 
     @abstractmethod
-    def preprocess(self, image: Image.Image, prompt: str) -> Any:
-        """Подготовка входных данных"""
-        pass
-
-    
-    @abstractmethod
-    def generate(self, inputs: Any, **kwargs) -> str:
-        """Генерация ответа"""
-        pass
-
-    
-    def parse_coordinates(self, raw_output: Any) -> List[Detection]:
-        pass
-    
-
-    def detect(self, image: Image.Image, prompt: str = "Detect objects") -> List[Detection]:
+    def detect(self, image: Image.Image, classes: Optional[List[str]] = None) -> List[Detection]:
         """
-        Высокоуровневая обертка (Wrapper)
+        Единая точка входа для детекции.
+        :param image: Входное изображение
+        :param classes: Список классов для поиска (например, ["cat", "dog"]). 
+                        Если None, модель должна попытаться найти все объекты (если поддерживает).
         """
-        # 1. Подготавливаем данные
-        inputs = self.preprocess(image, prompt)
-        
-        # 2. Получаем сырой ответ от модели (текст или тензор)
-        raw_output = self.generate(inputs)
-        
-        # 3. Парсим результат в единый формат {label, bbox}
-        # У каждой модели этот метод будет свой (post_process)
-        formatted_output = self.parse_coordinates(raw_output)
-        
-        return formatted_output
-
-    # @abstractmethod
-    # def evaluate(self, dataset) -> dict:
-    #     """
-    #     Оценка модели на датасете.
-    #     Возвращает словарь метрик.
-    #     """
-    #     pass
+        pass
