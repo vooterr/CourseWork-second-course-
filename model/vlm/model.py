@@ -98,6 +98,11 @@ class DinoVLM(BaseVLM):
         
         inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(self.device)
         
+        # --- ИСПРАВЛЕНИЕ ТИПОВ ДАННЫХ ---
+        if self.config.dtype == "float16" and self.device in ["cuda", "auto"]:
+             inputs["pixel_values"] = inputs["pixel_values"].to(torch.float16)
+        # --------------------------------
+        
         with torch.no_grad():
             outputs = self.model(**inputs)
 
@@ -118,7 +123,6 @@ class DinoVLM(BaseVLM):
                 score=score.item()
             ))
         return detections
-
 
 # --- Kosmos-2 ---
 class KosmosVLM(BaseVLM):
