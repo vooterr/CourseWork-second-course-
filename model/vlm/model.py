@@ -76,17 +76,17 @@ class Florence2VLM(BaseVLM):
 class DinoVLM(BaseVLM):
     model_id = "IDEA-Research/grounding-dino-tiny"
 
-def load(self) -> None:
-    self.device = "cuda" if (self.config.device in ['cuda', 'auto'] and torch.cuda.is_available()) else "cpu"
-    self.processor = AutoProcessor.from_pretrained(self.model_id, cache_dir=self.cache_dir)
-    dtype = torch.float16 if self.config.dtype == "float16" else torch.float32
+    def load(self) -> None:
+        self.device = "cuda" if (self.config.device in ['cuda', 'auto'] and torch.cuda.is_available()) else "cpu"
+        self.processor = AutoProcessor.from_pretrained(self.model_id, cache_dir=self.cache_dir)
+        dtype = torch.float16 if self.config.dtype == "float16" else torch.float32
 
-    self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
-        self.model_id, 
-        device_map=self.device, 
-        torch_dtype=dtype, 
-        cache_dir=self.cache_dir
-    ).eval()
+        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
+            self.model_id, 
+            device_map=self.device, 
+            torch_dtype=dtype, 
+            cache_dir=self.cache_dir
+        ).eval()
 
     def detect(self, image: Image.Image, classes: Optional[List[str]] = None) -> List[Detection]:
         if not classes:
