@@ -77,34 +77,38 @@ class DinoVLM(BaseVLM):
     model_id = "IDEA-Research/grounding-dino-tiny"
 
     def load(self) -> None:
+        print(f"Loading {self.model_id}...")
         self.device = "cuda" if (self.config.device in ['cuda', 'auto'] and torch.cuda.is_available()) else "cpu"
         self.processor = AutoProcessor.from_pretrained(self.model_id, cache_dir=self.cache_dir)
-        dtype = torch.float16 if self.config.dtype == "float16" else torch.float32
-
+        self.torch_dtype = torch.float16 if self.config.dtype == 'float16' else torch.float32
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
-            self.model_id, 
-            device_map=self.device, 
-            torch_dtype=dtype, 
-            cache_dir=self.cache_dir
-        ).eval()
+            self.model_id, device_map=self.device, cache_dir=self.cache_dir, 
+            dtype=self.torch_dtype
+        ).to(self.device).eval()
+        
+        if self.config.dtype == 'float16':
+            self.model = self.model.half()
+        
+        print(self.model.device)
 
     def detect(self, image: Image.Image, classes: Optional[List[str]] = None) -> List[Detection]:
         if not classes:
             print("DINO requires specific classes.")
             return []
-            
+
         # DINO требует формат "class . class ."
         prompt = " . ".join(classes) + "."
-        
+
         inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(self.device)
-        
-        # --- ИСПРАВЛЕНИЕ ТИПОВ ДАННЫХ ---
-        if self.config.dtype == "float16" and self.device in ["cuda", "auto"]:
-             inputs["pixel_values"] = inputs["pixel_values"].to(torch.float16)
-        # --------------------------------
-        
+
+        if self.config.dtype == 'float16':
+            for key in inputs:
+                if torch.is_floating_point(inputs[key]):
+                    inputs[key] = inputs[key].to(torch.float16)
+    
         with torch.no_grad():
-            outputs = self.model(**inputs)
+            with torch.cuda.amp.autocast(enabled=(self.config.dtype == 'float16')):
+                outputs = self.model(**inputs)
 
         # Пост-процессинг встроен в библиотеку transformers для DINO
         results = self.processor.post_process_grounded_object_detection(
