@@ -1,12 +1,12 @@
 [project]
 name = "coursework"
 version = "0.1.0"
-description = ""
+description = "my_disc"
 authors = [
     {name = "vooterr",email = "zigl.zigl535@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10.0,<3.13"
+requires-python = ">=3.11.0,<3.13"
 dependencies = [
     "pillow (>=12.1.0,<13.0.0)",
     "hf-xet (>=1.2.0,<2.0.0)",
@@ -28,6 +28,8 @@ dependencies = [
     "einops (>=0.8.2,<0.9.0)",
     "vllm (>=0.15.1,<0.16.0)",
     "lm-format-enforcer (>=0.11.3,<0.12.0)",
+    "pandas (>=3.0.1,<4.0.0)",
+    "ultralytics (>=8.4.21,<9.0.0)",
 ]
 
 

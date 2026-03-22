@@ -13,10 +13,10 @@ from model.vlm.abstract_model import BaseVLM, Detection
 # --- Florence-2 ---
 class Florence2VLM(BaseVLM):
     model_id = "microsoft/Florence-2-large"
-
+    device = None
     def load(self) -> None:
         print(f"Loading {self.model_id}...")
-        self.device = "cuda" if self.config.device == "auto" and torch.cuda.is_available() else "cpu"
+        self.device = torch.cuda if self.config.device == "auto" and torch.cuda.is_available() else "cpu"
         dtype = torch.float16 if self.config.dtype == "float16" and self.device == "cuda" else torch.float32
         
         self.processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True, cache_dir=self.cache_dir)
@@ -78,11 +78,12 @@ class DinoVLM(BaseVLM):
 
     def load(self) -> None:
         print(f"Loading {self.model_id}...")
-        self.device = "cuda" if self.config.device == "auto" and torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if (self.config.device in ['cuda', 'auto'] and torch.cuda.is_available()) else "cpu"
         self.processor = AutoProcessor.from_pretrained(self.model_id, cache_dir=self.cache_dir)
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
             self.model_id, device_map=self.device, cache_dir=self.cache_dir
         ).to(self.device).eval()
+        print(self.model.device)
 
     def detect(self, image: Image.Image, classes: Optional[List[str]] = None) -> List[Detection]:
         if not classes:
@@ -90,7 +91,7 @@ class DinoVLM(BaseVLM):
             return []
             
         # DINO требует формат "class . class ."
-        prompt = ". ".join(classes) + "."
+        prompt = " . ".join(classes) + "."
         
         inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(self.device)
         
