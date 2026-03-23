@@ -3,6 +3,7 @@ from model.vlm.abstract_model import ModelConfig
 from metrics.detection import map_coco, match_classes, map_to_str
 
 from tqdm import tqdm
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -112,32 +113,47 @@ def evaluate_model_per_img(
 
 
 # ====== 4) main-проверка ======
+import argparse
+
+# ... (остальной ваш код импортов и функций) ...
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evaluation of VLM models")
+    parser.add_argument("--input_dir", type=str, required=True, help="Путь к папке с изображениями")
+    parser.add_argument("--ann_file", type=str, required=True, help="Путь к файлу аннотаций")
+    parser.add_argument("--output_file", type=str, required=True, help="Куда сохранить predictions.csv")
+    parser.add_argument("--model", type=str, default="dino", choices=["dino", "florence", "qwen"], help="Выбор модели")
+    parser.add_argument("--limit", type=int, default=None, help="Лимит изображений для теста")
+    
+    args = parser.parse_args()
+
     config = ModelConfig(device='auto', dtype='float16')
-    model = DinoVLM(config)
+    
+    # Инициализация нужной модели
+    model = DinoVLM(config=config)
 
-    input_dir = "data/coco/coco2017/train2017"
-    ann_file = 'data/coco/coco2017/annotations/annotations_train2017.csv'
-    output_dir = "predictions/coco_dino_tiny.csv"
-
-    gt = pd.read_csv(
-        ann_file
-    )
-
+    # Загрузка GT
+    gt = pd.read_csv(args.ann_file)
     gt = normalize_df(gt)
     classes = sorted(pd.unique(gt["class"]).tolist())
 
-    pred = evaluate_model_per_img(model=model, input_dir=input_dir, ann_file=ann_file, output_file=output_dir, classes=classes)
+    # Запуск
+    print(f"Запуск модели {args.model} на данных {args.input_dir}...")
+    pred = evaluate_model_per_img(
+        limit=args.limit,
+        model=model, 
+        input_dir=args.input_dir, 
+        ann_file=args.ann_file, 
+        output_file=args.output_file, 
+        classes=classes
+    )
+    
     pred = normalize_df(pred)
-
     processed_images = pred["image_name"].unique()
     gt_subset = gt[gt["image_name"].isin(processed_images)].copy()
 
     print("raw pred classes:\n", pred["class"].value_counts(dropna=False))
-
-    print("reduced pred classes:\n", pred["class"].value_counts(dropna=False))
-
     print("pred rows:", len(pred), "gt rows:", len(gt))
-    print("common classes:", sorted(set(pred["class"]) & set(gt["class"])))
-        
+    
+    # Расчет метрик
     print(map_to_str(map_coco(pred=pred, gt=gt_subset, classes=classes)))
