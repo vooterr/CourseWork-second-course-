@@ -101,6 +101,7 @@ def evaluate_model_per_img(
             
         if (idx % 1000 == 0 and idx != 0):
             temp_df = pd.DataFrame(rows_all)
+            rows_all = []
             temp_df.to_csv(output_file, mode='a', index=False, header=False)
 
 
