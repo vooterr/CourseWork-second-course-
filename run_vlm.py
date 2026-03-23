@@ -65,7 +65,7 @@ def evaluate_model_per_img(
     classes: list[str] | None = None
 ): 
     if model is None:
-        return pd.DataFrame(columns=['image_name', 'class', 'x1', 'y1', 'x2', 'y2'])
+        return pd.DataFrame(columns=['image_name', 'class', 'score', 'x1', 'y1', 'x2', 'y2'])
     
     model.load()
     img_dir = Path(input_dir)
@@ -73,7 +73,7 @@ def evaluate_model_per_img(
     
     ann = pd.read_csv(ann_file)
     ann_grp = ann.groupby('image_name').agg(list)['class']
-    
+    pd.DataFrame(columns=['image_name', 'class', 'score', 'x1', 'y1', 'x2', 'y2']).to_csv(output_file, index=False)
     for idx, img_path in tqdm(enumerate(sorted(img_dir.iterdir()))):
         if limit != None and idx >= limit: 
             break
@@ -84,7 +84,7 @@ def evaluate_model_per_img(
         if (img_path.name not in ann_grp.index):
             continue
         
-        clss = ann_grp.loc[img_path.name]
+        clss = list(set(ann_grp.loc[img_path.name]))
         dets = model.detect(img, clss)
         for d in dets:
             rows_all.append(
@@ -98,8 +98,14 @@ def evaluate_model_per_img(
                     "y2": float(d.bbox[3])
                 }
             )
-    pred = pd.DataFrame(data=rows_all, columns=['image_name', 'class', 'score', 'x1', 'y1', 'x2', 'y2'])
-    pred.to_csv(output_file, index=False)
+            
+        if (idx % 1000 == 0 and idx != 0):
+            temp_df = pd.DataFrame(rows_all)
+            temp_df.to_csv(output_file, mode='a', index=False, header=False)
+
+
+    pd.DataFrame(rows_all).to_csv(output_file, mode='a', index=False, header=False)
+    pred = pd.read_csv(output_file)
     return pred
         
 
@@ -120,7 +126,7 @@ if __name__ == "__main__":
     gt = normalize_df(gt)
     classes = sorted(pd.unique(gt["class"]).tolist())
 
-    pred = evaluate_model_per_img(model=model, input_dir=input_dir, ann_file=ann_file, output_file=output_dir, classes=classes)
+    pred = evaluate_model_per_img(limit=50, model=model, input_dir=input_dir, ann_file=ann_file, output_file=output_dir, classes=classes)
     pred = normalize_df(pred)
 
     processed_images = pred["image_name"].unique()
