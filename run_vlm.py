@@ -126,7 +126,7 @@ if __name__ == "__main__":
     gt = normalize_df(gt)
     classes = sorted(pd.unique(gt["class"]).tolist())
 
-    pred = evaluate_model_per_img(limit=50, model=model, input_dir=input_dir, ann_file=ann_file, output_file=output_dir, classes=classes)
+    pred = evaluate_model_per_img(model=model, input_dir=input_dir, ann_file=ann_file, output_file=output_dir, classes=classes)
     pred = normalize_df(pred)
 
     processed_images = pred["image_name"].unique()
