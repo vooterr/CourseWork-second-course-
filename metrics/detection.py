@@ -30,8 +30,8 @@ from model.vlm.abstract_model import BaseVLM, Detection
 #     return iou
 
 def match_boxes(
-    preds: List[Detection], 
-    gts: List[Detection], 
+    preds: List[Detection],
+    gts: List[Detection],
     iou_threshold: float = 0.5
 ) -> Tuple[int, int, int]:
     """
@@ -41,7 +41,7 @@ def match_boxes(
     # 1. Группируем по классам, так как сравнивать кота с собакой нет смысла
     # Но если задача class-agnostic (просто найти объекты), этот шаг можно пропустить.
     # Здесь делаем строгое сравнение по label.
-    
+
     tp, fp = 0, 0
     # Создаем копии списков, чтобы удалять найденные
     gts_pool = gts.copy()
@@ -49,30 +49,30 @@ def match_boxes(
 
     # Сначала ищем совпадения
     matches = []
-    
+
     for p_idx, p in enumerate(preds_pool):
         best_iou = 0.0
         best_gt_idx = -1
-        
+
         for g_idx, g in enumerate(gts_pool):
             # Сверяем лейбл (case-insensitive)
             if p.label.lower() != g.label.lower():
                 continue
-            
+
             iou = calculate_iou(p.bbox, g.bbox)
             if iou >= best_iou:
                 best_iou = iou
                 best_gt_idx = g_idx
-        
+
         if best_iou >= iou_threshold:
             matches.append((p_idx, best_gt_idx, best_iou))
 
     # Сортируем совпадения по IoU (Greedy matching - забираем лучшие первыми)
     matches.sort(key=lambda x: x[2], reverse=True)
-    
+
     matched_gt_indices = set()
     matched_pred_indices = set()
-    
+
     for p_idx, g_idx, _ in matches:
         if g_idx not in matched_gt_indices and p_idx not in matched_pred_indices:
             tp += 1
@@ -81,16 +81,16 @@ def match_boxes(
 
     # FP = Предсказания, которым не хватило пары
     fp = len(preds) - tp
-    
+
     # FN = Истинные объекты, которые не нашли
     fn = len(gts) - tp
-    
+
     return tp, fp, fn
 
 def compute_image_metrics(
-    model: BaseVLM, 
-    image_path: str, 
-    ground_truths: List[Dict], 
+    model: BaseVLM,
+    image_path: str,
+    ground_truths: List[Dict],
     prompt: str = "Detect objects"
 ) -> Dict[str, int]:
     """
@@ -108,21 +108,21 @@ def compute_image_metrics(
 
     # 1. Инференс
     predictions = model.detect(image, prompt=prompt)
-    
+
     # 2. Подготовка GT (предполагаем формат input dict: {'label': 'dog', 'bbox': [x1, y1, x2, y2]})
     gt_detections = [
-        Detection(label=item['label'], bbox=item['bbox']) 
+        Detection(label=item['label'], bbox=item['bbox'])
         for item in ground_truths
     ]
 
     # 3. Расчет
     tp, fp, fn = match_boxes(predictions, gt_detections, iou_threshold=0.5)
-    
+
     return {"tp": tp, "fp": fp, "fn": fn}
 
 def evaluate_dataset(
-    model: BaseVLM, 
-    dataset_dir: str, 
+    model: BaseVLM,
+    dataset_dir: str,
     annotation_file: str,
     prompt: str = "Detect objects"
 ) -> Dict[str, float]:
@@ -131,22 +131,22 @@ def evaluate_dataset(
     dataset_dir: путь к папке с изображениями
     annotation_file: путь к json файлу вида [{"file_name": "1.jpg", "objects": [...]}]
     """
-    
+
     # Загружаем аннотации
     with open(annotation_file, 'r', encoding='utf-8') as f:
         dataset = json.load(f)
 
     total_tp, total_fp, total_fn = 0, 0, 0
-    
+
     print(f"Starting evaluation on {len(dataset)} images...")
 
     for item in tqdm(dataset):
         file_name = item['file_name']
         image_path = os.path.join(dataset_dir, file_name)
         gt_objects = item.get('objects', []) # Expects list of dicts with label and bbox
-        
+
         metrics = compute_image_metrics(model, image_path, gt_objects, prompt)
-        
+
         total_tp += metrics['tp']
         total_fp += metrics['fp']
         total_fn += metrics['fn']
@@ -162,7 +162,7 @@ def evaluate_dataset(
         "f1_score": f1,
         "raw_counts": {"tp": total_tp, "fp": total_fp, "fn": total_fn}
     }
-    
+
     return results
 
 
@@ -176,74 +176,132 @@ def calculate_iou(
     iy2 = min(a[3], b[3])
     iw = max(0, ix2 - ix1)
     ih = max(0, iy2 - iy1)
-    
+
     inter = iw * ih
     area1 = max(0, (a[2] - a[0]) * (a[3] - a[1]))
     area2 = max(0, (b[2] - b[0]) * (b[3] - b[1]))
     union = area1 + area2 - inter
-    
+
     return inter / union if union > 0 else 0.0
 
 
-def match_classes(
-    pred_cls: pd.DataFrame | None = None,
-    gt_cls: pd.DataFrame | None = None,
-    iou_trh: float = 0.5
-):
+def calculate_iou_matrix(boxes_a: np.ndarray, boxes_b: np.ndarray) -> np.ndarray:
+    """(N, 4) x (M, 4) -> (N, M) IoU matrix"""
+    ix1 = np.maximum(boxes_a[:, 0:1], boxes_b[:, 0])   # (N, M)
+    iy1 = np.maximum(boxes_a[:, 1:2], boxes_b[:, 1])
+    ix2 = np.minimum(boxes_a[:, 2:3], boxes_b[:, 2])
+    iy2 = np.minimum(boxes_a[:, 3:4], boxes_b[:, 3])
+
+    inter = np.maximum(0, ix2 - ix1) * np.maximum(0, iy2 - iy1)
+
+    area_a = (boxes_a[:, 2] - boxes_a[:, 0]) * (boxes_a[:, 3] - boxes_a[:, 1])
+    area_b = (boxes_b[:, 2] - boxes_b[:, 0]) * (boxes_b[:, 3] - boxes_b[:, 1])
+    union = area_a[:, None] + area_b[None, :] - inter
+
+    return inter / np.maximum(union, 1e-12)
+
+
+def match_classes(pred_cls, gt_cls, iou_trh=0.5):
     BOX_COLS = ['x1', 'y1', 'x2', 'y2']
-    if (pred_cls is None or gt_cls is None):
-        return 
+    if pred_cls is None or gt_cls is None or len(pred_cls) == 0:
+        return None
+
     pred_cls = pred_cls.sort_values("score", ascending=False).reset_index(drop=True)
-    
+    tp = np.zeros(len(pred_cls), dtype=np.int8)
+    fp = np.zeros(len(pred_cls), dtype=np.int8)
+
     gt_by_img = {img: g.reset_index(drop=True) for img, g in gt_cls.groupby("image_name")}
     used_by_img = {img: np.zeros(len(g), dtype=bool) for img, g in gt_by_img.items()}
 
-    tp = np.zeros(len(pred_cls), dtype=np.int8)
-    fp = np.zeros(len(pred_cls), dtype=np.int8)
-    
-    for i, p in pred_cls.iterrows():
-        i = int(i)
-        img = p['image_name']
+    # Группируем предсказания по image_name, обрабатываем пачками
+    for img, pred_img in pred_cls.groupby("image_name"):
+        p_indices = pred_img.index.to_numpy()
         if img not in gt_by_img:
-            fp[i] = 1
+            fp[p_indices] = 1
             continue
-        
+
         g = gt_by_img[img]
         used = used_by_img[img]
-        
-        p_box = p[BOX_COLS].to_numpy(dtype=float)
-        
-        best_iou = 0
-        best_j = -1
-        
-        for j in range(len(g)):
-            if used[j]:
-                continue
-            g_box = g.loc[j, BOX_COLS].to_numpy(dtype=float)
-            v = calculate_iou(g_box, p_box)
-            if v > best_iou:
-                best_iou = v
-                best_j = j
-        if best_iou > iou_trh and best_j != -1:
-            tp[i] = 1
-            used[best_j] = True
-        else:
-            fp[i] = 1
+
+        p_boxes = pred_img[BOX_COLS].to_numpy(dtype=float)
+        g_boxes = g[BOX_COLS].to_numpy(dtype=float)
+
+        iou_mat = calculate_iou_matrix(p_boxes, g_boxes)  # (N_pred, N_gt)
+        iou_mat[:, used] = 0  # маскируем уже использованные GT
+
+        # Жадное сопоставление
+        for local_i, global_i in enumerate(p_indices):
+            best_j = np.argmax(iou_mat[local_i])
+            if iou_mat[local_i, best_j] >= iou_trh:
+                tp[global_i] = 1
+                used[best_j] = True
+                iou_mat[:, best_j] = 0  # блокируем GT для следующих
+            else:
+                fp[global_i] = 1
+
     scores = pred_cls['score'].to_numpy()
-    n_gt = len(gt_cls)
-    return tp, fp, scores, n_gt
-        
+    return tp, fp, scores, len(gt_cls)
+
+
+# def match_classes(
+#     pred_cls: pd.DataFrame | None = None,
+#     gt_cls: pd.DataFrame | None = None,
+#     iou_trh: float = 0.5
+# ):
+#     BOX_COLS = ['x1', 'y1', 'x2', 'y2']
+#     if (pred_cls is None or gt_cls is None):
+#         return
+#     pred_cls = pred_cls.sort_values("score", ascending=False).reset_index(drop=True)
+
+#     gt_by_img = {img: g.reset_index(drop=True) for img, g in gt_cls.groupby("image_name")}
+#     used_by_img = {img: np.zeros(len(g), dtype=bool) for img, g in gt_by_img.items()}
+
+#     tp = np.zeros(len(pred_cls), dtype=np.int8)
+#     fp = np.zeros(len(pred_cls), dtype=np.int8)
+
+#     for i, p in pred_cls.iterrows():
+#         i = int(i)
+#         img = p['image_name']
+#         if img not in gt_by_img:
+#             fp[i] = 1
+#             continue
+
+#         g = gt_by_img[img]
+#         used = used_by_img[img]
+
+#         p_box = p[BOX_COLS].to_numpy(dtype=float)
+
+#         best_iou = 0
+#         best_j = -1
+
+#         for j in range(len(g)):
+#             if used[j]:
+#                 continue
+#             g_box = g.loc[j, BOX_COLS].to_numpy(dtype=float)
+#             v = calculate_iou(g_box, p_box)
+#             if v > best_iou:
+#                 best_iou = v
+#                 best_j = j
+#         if best_iou > iou_trh and best_j != -1:
+#             tp[i] = 1
+#             used[best_j] = True
+#         else:
+#             fp[i] = 1
+#     scores = pred_cls['score'].to_numpy()
+#     n_gt = len(gt_cls)
+#     return tp, fp, scores, n_gt
+
 
 def precision_recall(tp, fp, n_gt):
     tp_cumsum = np.cumsum(tp)
     fp_cumsum = np.cumsum(fp)
-    
+
     denom = np.maximum(tp_cumsum + fp_cumsum, 1e-12)
     precision = tp_cumsum / denom
     recall = tp_cumsum / max(int(n_gt), 1)
-    
+
     return precision, recall
-    
+
 
 def ap_from_pr(prec: np.ndarray, rec: np.ndarray, n_gt: int | None = None) -> float:
     if n_gt is not None and n_gt == 0:
@@ -273,18 +331,18 @@ def evaluate_model(
 ):
     if not model:
         return
-    
+
     model.load()
-    
+
     img_dir = Path(input_dir)
-    
+
     df = pd.DataFrame(columns=["image_name", "class", "score", "x1", "y1", "x2", "y2"])
-    
+    all_rows = []
     for idx, img_path in enumerate(img_dir.iterdir()):
         if idx > limit:
             break
         img = Image.open(img_path)
-        
+
         detections = model.detect(img, classes)
         rows = [
             {"image_name": img_path.name,
@@ -294,31 +352,43 @@ def evaluate_model(
                 "y1": detect.bbox[1],
                 "x2": detect.bbox[2],
                 'y2': detect.bbox[3]
-            } 
+            }
             for detect in detections
         ]
         #print(rows)
-        if rows:
-            df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-        
+        # if rows:
+        #     df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+        all_rows.extend(rows)
+
+    df = pd.DataFrame(all_rows)
     df.to_csv(ann_file, index=False)
     return df
-    
-    
+
+
 def map_voc(
     pred: pd.DataFrame,
     gt: pd.DataFrame,
     iou_thr: float = 0.5,
     classes: list[str] | None = None,
 ) -> tuple[float, dict[str, float]]:
+    print(f"Getting map_voc for iou_thr={iou_thr:.2f}")
     if classes is None:
         classes = sorted(set(gt["class"].unique()) | set(pred["class"].unique()))
 
     ap_by_class: dict[str, float] = {}
+    print(f"Getting ap for {len(classes)} classes")
+    if not hasattr(map_voc, "pred_by_class"):
+        map_voc.pred_by_class = dict(list(pred.groupby("class")))
+    if not hasattr(map_voc, "gt_by_class"):
+        map_voc.gt_by_class = dict(list(gt.groupby("class")))
 
-    for cls in classes:
-        pred_cls = pred[pred["class"] == cls].copy()
-        gt_cls = gt[gt["class"] == cls].copy()
+    pred_by_class = map_voc.pred_by_class
+    gt_by_class   = map_voc.gt_by_class
+
+    # Then inside the loop...
+    for cls in tqdm(classes):
+        pred_cls = pred_by_class.get(cls)  # O(1) lookup, no scan
+        gt_cls   = gt_by_class.get(cls)
 
         if len(gt_cls) == 0:
             ap_by_class[cls] = np.nan  # или 0.0, выбери политику
@@ -332,8 +402,8 @@ def map_voc(
     vals = vals[~np.isnan(vals)]
     mAP = float(np.mean(vals)) if len(vals) else float("nan")
     return mAP, ap_by_class
-    
-    
+
+
 def map_coco(
     pred: pd.DataFrame,
     gt: pd.DataFrame,
@@ -358,16 +428,16 @@ def map_coco(
         "mAP_per_iou": ap_per_iou,
         "AP_matrix_per_class": ap_per_class,  # список AP по IoU для каждого класса
     }
-    
+
 def map_to_str(
     map: dict,
     iou_thrs: list[float] = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
 ) -> str:
 
-        
+
     output = f'mAP: {float(map['mAP']):<8.4f}\n'
     output += 'mAP per IoU\n:'
-    
+
     for thr in iou_thrs:
         output += f'\tmAP@{thr}: {map['mAP_per_iou'][thr]:.4f}\n'
     output += "AP per cls\n"
@@ -375,5 +445,5 @@ def map_to_str(
     df.columns = iou_thrs
     df.index.name = 'Class'
     output += df.to_string()
-        
+
     return output

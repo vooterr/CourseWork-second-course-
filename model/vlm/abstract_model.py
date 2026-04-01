@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Detection:
+    image_name: Optional[str]
     label: str
     bbox: List[float]  # [x1, y1, x2, y2]
     score: Optional[float] = None
@@ -17,13 +18,13 @@ class ModelConfig:
     quantization: Optional[str] = None
 
 class BaseVLM(ABC):
-    cache_dir = "./models" 
-    
+    cache_dir = "./models"
+
     def __init__(self, config: ModelConfig):
         self.config = config
         self.model = None
         self.processor = None
-        
+
     @abstractmethod
     def load(self) -> None:
         """Загрузка модели и процессора"""
@@ -34,7 +35,7 @@ class BaseVLM(ABC):
         """
         Единая точка входа для детекции.
         :param image: Входное изображение
-        :param classes: Список классов для поиска (например, ["cat", "dog"]). 
+        :param classes: Список классов для поиска (например, ["cat", "dog"]).
                         Если None, модель должна попытаться найти все объекты (если поддерживает).
         """
         pass

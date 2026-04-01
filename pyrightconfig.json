@@ -1,4 +1,4 @@
 {
-  "venvPath": ".",
-  "venv": ".venv"
+    "venvPath": "/home/user/.cache/pypoetry/virtualenvs",
+    "venv": "/home/votter/.cache/pypoetry/virtualenvs/coursework-LNEy4MES-py3.12"
 }

@@ -44,3 +44,7 @@ priority = "explicit"
 
 
 [tool.poetry.dependencies]
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^7.2.0"
+
