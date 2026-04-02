@@ -8,15 +8,18 @@ import logging
 
 
 class yolo_model:
+    model_id: str
+    device: str
 
-
-    def __init__(self):
+    def __init__(self, model_id='yolo11n.pt', device="cuda"):
+        self.model_id = model_id
+        self.device = device
         self.model = None
 
 
-    def load(self, model_id: str = 'yolo11n.pt'):
-        self.model = YOLO(model_id)
-        print(f"Loading {model_id}")
+    def load(self):
+        self.model = YOLO(self.model_id).to(torch.device(self.device if torch.cuda.is_available() else "cpu"))
+        print(f"Loading {self.model_id}")
         logging.getLogger("ultralytics").setLevel(logging.ERROR)
 
 

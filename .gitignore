@@ -4,3 +4,4 @@ __pycache__
 /models/*
 poetry.lock
 *.jpg
+*.pt

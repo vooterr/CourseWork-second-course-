@@ -20,7 +20,7 @@ from metrics.detection import map_to_str, map_coco
 
 N_WORKERS = 1
 Q_SIZE = 10
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 
 async def producer(queue, img_dir, limits: Optional[int] = None):
     batch = []
@@ -136,11 +136,20 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir", type=str, default="data/coco/coco2017/train2017")
     parser.add_argument("--ann_file", type=str, default="data/coco/coco2017/annotations/annotations_train2017.csv")
     parser.add_argument("--output_dir", type=str, default="predictions/coco_yolo.csv")
+    parser.add_argument("--model", type=str, default="yolo11n.pt")
+    parser.add_argument("--n_workers", type=int, default=1)
+    parser.add_argument("--q_size", type=int, default=10)
+    parser.add_argument("--batch_size", type=int, default=32)
+
     args = parser.parse_args()
 
+    Q_SIZE = args.q_size
+    N_WORKERS = args.n_workers
+    BATCH_SIZE = args.batch_size
+
     n_models = []
-    for _ in range(N_WORKERS):
-        model = yolo_model()
+    for idx in range(N_WORKERS):
+        model = yolo_model(model_id=args.model, device=f"cuda:{idx}")
         model.load()
         n_models.append(model)
 

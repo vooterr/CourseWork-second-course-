@@ -9,7 +9,7 @@ def evaluate_dataset(gt_path, pred_path):
 
 if __name__ == "__main__":
     pred_dino_path = 'predictions/predictions_dino_night.csv'
-    pred_yolo_path = 'predictions/coco_yolo.csv'
+    pred_yolo_path = 'predictions/predictions_yolo.csv'
     gt_path = 'data/coco/coco2017/annotations/annotations_train2017.csv'
     gt = pd.read_csv(gt_path)
     gt = gt.drop(columns=['idx'])
@@ -41,4 +41,6 @@ if __name__ == "__main__":
     # with open('predictions/data_for_pred_dino_night.txt', 'r') as f:
     #     data = dict(eval(f.read()))
     # print(map_to_str(data))
+
+    print(pred_yolo['class'].value_counts())
     print(map_coco(gt=gt, pred=pred_yolo, classes=five_clss))
