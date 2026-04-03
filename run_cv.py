@@ -82,7 +82,7 @@ async def run_cv(
     classes: list[str] | None = None,
     limits: Optional[int] = None
 ):
-    pd.DataFrame(columns=['image_name', 'class', 'score', 'x1', 'y1', 'x2', 'y2'])
+    pd.DataFrame(columns=['image_name', 'class', 'score', 'x1', 'y1', 'x2', 'y2']).to_csv(output_file)
     img_dir = Path(input_dir)
     queue = asyncio.Queue(maxsize=Q_SIZE)
 
