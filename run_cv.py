@@ -41,7 +41,7 @@ async def producer(queue, img_dir, limits: Optional[int] = None):
     await queue.put(None)
 
 
-async def consumer(queue, model) -> list[Detection]:
+async def consumer(queue, model, output_file) -> list[Detection]:
     rows_all = []
     while True:
         batch = await queue.get()
@@ -64,9 +64,15 @@ async def consumer(queue, model) -> list[Detection]:
                     "y2": float(d.bbox[3]),
                 }
             )
+        pd.DataFrame(rows).to_csv(
+            output_file,
+            index=False,
+            mode='a',
+            header=False
+        )
         queue.task_done()
-        rows_all.extend(rows)
-    return rows_all
+        #rows_all.extend(rows)
+    #return rows_all
 
 
 async def run_cv(
@@ -76,6 +82,7 @@ async def run_cv(
     classes: list[str] | None = None,
     limits: Optional[int] = None
 ):
+    pd.DataFrame(columns=['image_name', 'class', 'score', 'x1', 'y1', 'x2', 'y2'])
     img_dir = Path(input_dir)
     queue = asyncio.Queue(maxsize=Q_SIZE)
 
@@ -84,13 +91,13 @@ async def run_cv(
     ]
 
     for i in range(N_WORKERS):
-        tasks.append(asyncio.create_task(consumer(queue, models[i])))
+        tasks.append(asyncio.create_task(consumer(queue, models[i], output_file)))
 
     results = await asyncio.gather(*tasks)
-    rows_all = []
-    for r in results[1:]:  # пропускаем producer
-        rows_all.extend(r)
-    pd.DataFrame(rows_all).to_csv(output_file, index=False)
+    #rows_all = []
+    #for r in results[1:]:  # пропускаем producer
+        #rows_all.extend(r)
+    #pd.DataFrame(rows_all).to_csv(output_file, index=False)
 
 
 
